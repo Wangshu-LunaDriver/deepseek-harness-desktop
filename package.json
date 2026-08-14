@@ -30,7 +30,8 @@
       {
         "provider": "github",
         "owner": "Wangshu-LunaDriver",
-        "repo": "deepseek-harness-desktop"
+        "repo": "deepseek-harness-desktop",
+        "releaseType": "release"
       }
     ],
     "win": {
