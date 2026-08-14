@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-desktop",
-  "version": "0.1.0-rc.6",
+  "version": "0.1.0-rc.7",
   "description": "Electron desktop wrapper for DeepSeek Harness — double-click to run the official web UI in a native window (prototype).",
   "private": true,
   "main": "main.js",
