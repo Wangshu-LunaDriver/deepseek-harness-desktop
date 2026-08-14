@@ -1,0 +1,70 @@
+name: Track upstream DeepSeek Harness
+
+# Auto-release pipeline: periodically check npm for a newer @deepseek-ai/dsh.
+# When upstream publishes a new version, bump the bundled dependency + the app
+# version, rebuild the NSIS installer, and publish a GitHub Release — which the
+# installed desktop app then auto-updates to via electron-updater.
+on:
+  schedule:
+    - cron: '17 3 * * *'   # daily 03:17 UTC
+  workflow_dispatch: {}      # manual trigger from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check for newer upstream @deepseek-ai/dsh
+        id: check
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $current = $pkg.dependencies.'@deepseek-ai/dsh'
+          Write-Host "current=$current"
+          # npm's own semver range resolution: returns the newest version > current
+          $latest = (npm view "@deepseek-ai/dsh@>$current" version 2>$null | Select-Object -Last 1)
+          if (-not $latest) { $latest = '' }
+          Write-Host "latest=$latest"
+          "current=$current" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+          "latest=$latest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+
+      - name: Bump dependency and app version
+        if: steps.check.outputs.latest != ''
+        shell: pwsh
+        env:
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: |
+          npm install "@deepseek-ai/dsh@$env:LATEST" --save-exact --package-lock-only --no-audit --no-fund
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.LATEST;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+      - name: Install dependencies
+        if: steps.check.outputs.latest != ''
+        run: npm ci --ignore-scripts
+
+      - name: Build & publish to GitHub Releases
+        if: steps.check.outputs.latest != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --publish always
+
+      - name: Commit bumped files
+        if: steps.check.outputs.latest != ''
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: track upstream @deepseek-ai/dsh@${{ steps.check.outputs.latest }}" --allow-empty
+          git push origin HEAD

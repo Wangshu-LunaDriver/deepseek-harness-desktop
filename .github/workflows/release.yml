@@ -1,0 +1,34 @@
+name: Build & Release
+
+# Push a tag like `v0.1.1` to trigger: builds the NSIS installer and publishes
+# it as a GitHub Release (which the app's auto-updater reads from).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        # --ignore-scripts: koffi's prebuilt binary comes from its optional
+        # dependency, and electron-builder downloads the Electron runtime itself,
+        # so skipping lifecycle scripts avoids a native rebuild on the runner.
+        run: npm ci --ignore-scripts
+
+      - name: Build & publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --publish always

@@ -1,0 +1,47 @@
+{
+  "name": "deepseek-harness-desktop",
+  "version": "0.1.0-rc.6",
+  "description": "Electron desktop wrapper for DeepSeek Harness — double-click to run the official web UI in a native window (prototype).",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis",
+    "release": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.0-rc.6",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "dev.harness.desktop",
+    "productName": "DeepSeek Harness Desktop",
+    "asar": false,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Wangshu-LunaDriver",
+        "repo": "deepseek-harness-desktop"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "DeepSeek-Harness-Desktop-${version}-setup.exe"
+    }
+  }
+}
