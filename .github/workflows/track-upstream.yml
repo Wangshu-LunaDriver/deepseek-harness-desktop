@@ -33,10 +33,27 @@ jobs:
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
           $current = $pkg.dependencies.'@deepseek-ai/dsh'
           Write-Host "current=$current"
-          # npm's own semver range resolution: returns the newest version > current
-          $latest = (npm view "@deepseek-ai/dsh@>$current" version 2>$null | Select-Object -Last 1)
-          if (-not $latest) { $latest = '' }
+
+          # Do NOT use `npm view "@deepseek-ai/dsh@>$current"` here.
+          # semver only considers prereleases inside the range's own x.y.z tuple:
+          # '>0.1.0-rc.8' matched nothing after upstream moved to 0.1.1-rc.1 / 0.2.x,
+          # npm exited 1 ("No match found"), and this pwsh step inherited that exit
+          # code -> the job failed every single day from 2026-09-16 on.
+          # Track the registry's `latest` dist-tag instead, and reset $LASTEXITCODE
+          # explicitly so a transient npm failure is retried rather than silently red.
+          $latest = ''
+          $code = 0
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            $out = (npm view '@deepseek-ai/dsh' version --fetch-retries=2 2>$null | Select-Object -Last 1)
+            $code = $LASTEXITCODE
+            if ($code -eq 0) { $latest = "$out".Trim(); break }
+            Write-Host "npm view failed (exit $code), attempt $attempt"
+            Start-Sleep -Seconds 10
+          }
+          if ($code -ne 0) { throw "npm view failed after 3 attempts (exit $code)" }
+          if ($latest -eq $current) { $latest = '' }
           Write-Host "latest=$latest"
+
           "current=$current" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
           "latest=$latest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
 
