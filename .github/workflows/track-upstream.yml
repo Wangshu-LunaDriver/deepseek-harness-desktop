@@ -74,7 +74,20 @@ jobs:
         if: steps.check.outputs.latest != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win nsis --publish always
+          LATEST: ${{ steps.check.outputs.latest }}
+        shell: pwsh
+        run: |
+          # Pre-create the release. electron-builder's GitHub publisher fires two
+          # concurrent POST /releases calls; the loser gets
+          # 422 "Published releases must have a valid tag", and the "winning" release
+          # ends up with only a .blockmap while the installer and latest.yml are
+          # never uploaded — auto-update then silently breaks.
+          gh release view "v$env:LATEST" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "v$env:LATEST" --title "$env:LATEST" --notes "Upstream @deepseek-ai/dsh $env:LATEST"
+            if ($LASTEXITCODE -ne 0) { throw "gh release create failed for v$env:LATEST" }
+          }
+          npx electron-builder --win nsis --publish always
 
       - name: Commit bumped files
         if: steps.check.outputs.latest != ''
